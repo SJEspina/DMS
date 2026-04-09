@@ -18,9 +18,19 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libxml2-dev
 
+RUN docker-php-ext-install pdo_mysql || true
+
 RUN composer install --no-dev --optimize-autoloader
 RUN npm install
 RUN npm run build
+
+RUN mkdir -p storage/framework/cache \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/logs \
+    bootstrap/cache
+
+RUN chown -R application:application /app
 
 ENV WEB_DOCUMENT_ROOT=/app/public
 
