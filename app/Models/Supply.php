@@ -13,4 +13,9 @@ class Supply extends Model
         'stock',
         'status',
     ];
+
+    public function transactions()
+    {
+        return $this->hasMany(SupplyTransaction::class);
+    }
 }

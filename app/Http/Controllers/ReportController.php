@@ -3,9 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\Supply;
+use App\Models\SupplyTransaction;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,42 +15,105 @@ class ReportController extends Controller
         $today = Carbon::today();
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
+        $currentYear = Carbon::now()->year;
+        $currentMonth = Carbon::now()->month;
+        $daysInMonth = Carbon::now()->daysInMonth;
 
-        // Today's sale
+        // Today's sale - match dashboard logic (price * qty)
         $todaySale = Order::whereDate('created_at', $today)
-            ->sum(DB::raw('price'));
+            ->get()
+            ->sum(function ($order) {
+                return (float) $order->price * (int) $order->qty;
+            });
 
         // Today's total orders
         $todayTotalOrders = Order::whereDate('created_at', $today)->count();
 
-        // Monthly sales
+        // Monthly sales total - match dashboard logic (price * qty)
         $monthlySales = Order::whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->sum(DB::raw('price'));
+            ->get()
+            ->sum(function ($order) {
+                return (float) $order->price * (int) $order->qty;
+            });
 
-        // Monthly expense from supplies
-        $monthlyExpense = Supply::whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->sum(DB::raw('price'));
+        // Monthly expense total
+        $monthlyExpense = SupplyTransaction::where('type', 'in')
+            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->sum('total_cost');
 
-        // Order statistics - last 7 days
-        $orderStatistics = collect(range(6, 0))->map(function ($daysAgo) {
-            $date = Carbon::today()->subDays($daysAgo);
+        // Order statistics - all days of current month
+        $orderStatistics = collect(range(1, $daysInMonth))->map(function ($day) use ($currentYear, $currentMonth) {
+            $date = Carbon::create($currentYear, $currentMonth, $day);
 
             return [
                 'label' => $date->format('d M'),
+                'day' => $day,
                 'orders' => Order::whereDate('created_at', $date)->count(),
             ];
-        });
+        })->values();
 
-        // Sales overview - last 7 days
-        $salesOverview = collect(range(6, 0))->map(function ($daysAgo) {
-            $date = Carbon::today()->subDays($daysAgo);
+        // Sales overview - all days of current month
+        $salesOverview = collect(range(1, $daysInMonth))->map(function ($day) use ($currentYear, $currentMonth) {
+            $date = Carbon::create($currentYear, $currentMonth, $day);
+
+            $sales = Order::whereDate('created_at', $date)
+                ->get()
+                ->sum(function ($order) {
+                    return (float) $order->price * (int) $order->qty;
+                });
 
             return [
                 'label' => $date->format('d M'),
-                'sales' => (float) Order::whereDate('created_at', $date)
-                    ->sum(DB::raw('price')),
+                'day' => $day,
+                'sales' => (float) $sales,
             ];
-        });
+        })->values();
+
+        // Expense overview - January to December
+        $months = [
+            1 => 'Jan',
+            2 => 'Feb',
+            3 => 'Mar',
+            4 => 'Apr',
+            5 => 'May',
+            6 => 'Jun',
+            7 => 'Jul',
+            8 => 'Aug',
+            9 => 'Sep',
+            10 => 'Oct',
+            11 => 'Nov',
+            12 => 'Dec',
+        ];
+
+        $expenseOverview = collect($months)->map(function ($label, $monthNumber) use ($currentYear) {
+            $expense = SupplyTransaction::where('type', 'in')
+                ->whereYear('created_at', $currentYear)
+                ->whereMonth('created_at', $monthNumber)
+                ->sum('total_cost');
+
+            return [
+                'label' => $label,
+                'expense' => (float) $expense,
+            ];
+        })->values();
+
+        // Recent expense details
+        $expenseDetails = SupplyTransaction::with('supply')
+            ->where('type', 'in')
+            ->latest()
+            ->take(10)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'date' => $item->created_at->format('M d, Y'),
+                    'name' => $item->supply ? $item->supply->name : 'N/A',
+                    'quantity' => $item->quantity,
+                    'price' => (float) $item->unit_price,
+                    'total' => (float) $item->total_cost,
+                    'notes' => $item->notes,
+                ];
+            });
 
         return Inertia::render('Reports/Index', [
             'summary' => [
@@ -62,6 +124,8 @@ class ReportController extends Controller
             ],
             'orderStatistics' => $orderStatistics,
             'salesOverview' => $salesOverview,
+            'expenseOverview' => $expenseOverview,
+            'expenseDetails' => $expenseDetails,
         ]);
     }
 }

@@ -16,8 +16,25 @@ class OrderController extends Controller
             $query->where('customer', 'like', '%' . $request->search . '%');
         }
 
+        $orders = $query->latest()->paginate(10)->withQueryString();
+
+        $orders->through(function ($order) {
+            $total = (float) $order->price * (int) $order->qty;
+            $downpayment = (float) ($order->downpayment ?? 0);
+
+            if ($downpayment <= 0) {
+                $order->payment_status = 'Unpaid';
+            } elseif ($downpayment >= $total) {
+                $order->payment_status = 'Paid';
+            } else {
+                $order->payment_status = 'Partially Paid';
+            }
+
+            return $order;
+        });
+
         return Inertia::render('Orders/Index', [
-            'orders' => $query->latest()->paginate(10)->withQueryString(),
+            'orders' => $orders,
             'filters' => $request->only('search'),
         ]);
     }
@@ -33,10 +50,19 @@ class OrderController extends Controller
             'deadline' => 'nullable|date',
             'customer' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
-            'product' => 'required|string|max:255',
+            'product' => 'required|in:TSHIRT,POLOSHIRT,HOODIE,LONGSLEEVE,SANDO ONLY,SHORT ONLY,SANDO UP & DOWN,TSHIRT UP & DOWN,PLAQUES,MUG,TARP,OTHERS',
             'qty' => 'required|integer|min:1',
+            'downpayment' => 'nullable|numeric|min:0',
             'status' => 'required|in:Pending,Ongoing,Done',
         ]);
+
+        $validated['downpayment'] = $validated['downpayment'] ?? 0;
+
+        if ($validated['downpayment'] > ($validated['price'] * $validated['qty'])) {
+            return back()->withErrors([
+                'downpayment' => 'Downpayment cannot be greater than the total amount.',
+            ])->withInput();
+        }
 
         Order::create($validated);
 
@@ -56,10 +82,19 @@ class OrderController extends Controller
             'deadline' => 'nullable|date',
             'customer' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
-            'product' => 'required|string|max:255',
+            'product' => 'required|in:TSHIRT,POLOSHIRT,HOODIE,LONGSLEEVE,SANDO ONLY,SHORT ONLY,SANDO UP & DOWN,TSHIRT UP & DOWN,PLAQUES,MUG,TARP,OTHERS',
             'qty' => 'required|integer|min:1',
+            'downpayment' => 'nullable|numeric|min:0',
             'status' => 'required|in:Pending,Ongoing,Done',
         ]);
+
+        $validated['downpayment'] = $validated['downpayment'] ?? 0;
+
+        if ($validated['downpayment'] > ($validated['price'] * $validated['qty'])) {
+            return back()->withErrors([
+                'downpayment' => 'Downpayment cannot be greater than the total amount.',
+            ])->withInput();
+        }
 
         $order->update($validated);
 
@@ -71,5 +106,16 @@ class OrderController extends Controller
         $order->delete();
 
         return redirect()->route('orders.index');
+    }
+
+    public function payBalance(Order $order)
+    {
+        $total = $order->price * $order->qty;
+
+        $order->update([
+            'downpayment' => $total
+        ]);
+
+        return back();
     }
 }

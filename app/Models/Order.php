@@ -12,7 +12,7 @@ class Order extends Model
         'price',
         'product',
         'qty',
+        'downpayment',
         'status',
-        'deadline',
     ];
 }
