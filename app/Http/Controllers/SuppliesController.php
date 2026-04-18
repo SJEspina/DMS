@@ -56,6 +56,16 @@ class SuppliesController extends Controller
 
     public function store(Request $request)
     {
+        $normalizedName = strtoupper(trim($request->name));
+
+        $existingSupply = Supply::whereRaw('UPPER(name) = ?', [$normalizedName])->first();
+
+        if ($existingSupply) {
+            return back()->withErrors([
+                'name' => 'This supply already exists.',
+            ])->withInput();
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'category' => 'required|string|max:255',
@@ -63,6 +73,7 @@ class SuppliesController extends Controller
             'stock' => 'required|integer|min:0',
         ]);
 
+        $validated['name'] = $normalizedName;
         $validated['status'] = $this->getStatus($validated['stock']);
 
         DB::transaction(function () use ($validated) {
@@ -92,12 +103,25 @@ class SuppliesController extends Controller
 
     public function update(Request $request, Supply $supply)
     {
+        $normalizedName = strtoupper(trim($request->name));
+
+        $existingSupply = Supply::whereRaw('UPPER(name) = ?', [$normalizedName])
+            ->where('id', '!=', $supply->id)
+            ->first();
+
+        if ($existingSupply) {
+            return back()->withErrors([
+                'name' => 'This supply already exists.',
+            ])->withInput();
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'category' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
         ]);
 
+        $validated['name'] = $normalizedName;
         $validated['status'] = $this->getStatus($supply->stock);
 
         $supply->update($validated);

@@ -23,6 +23,11 @@ const formatPrice = (value) => {
     return "₱" + Number(value || 0).toFixed(2);
 };
 
+const formatDate = (value) => {
+    if (!value) return "No deadline";
+    return new Date(value).toLocaleDateString();
+};
+
 const getTotal = (order) => {
     return (Number(order.price) || 0) * (Number(order.qty) || 0);
 };
@@ -162,15 +167,11 @@ const paymentStatusClass = (status) => {
                                     class="transition hover:bg-gray-50"
                                 >
                                     <td class="whitespace-nowrap px-4 py-4">
-                                        {{
-                                            new Date(
-                                                order.created_at,
-                                            ).toLocaleDateString()
-                                        }}
+                                        {{ formatDate(order.created_at) }}
                                     </td>
 
                                     <td class="whitespace-nowrap px-4 py-4">
-                                        {{ order.deadline ?? "No deadline" }}
+                                        {{ formatDate(order.deadline) }}
                                     </td>
 
                                     <td
@@ -238,7 +239,7 @@ const paymentStatusClass = (status) => {
 
                                     <td class="px-4 py-4">
                                         <div
-                                            class="flex items-center justify-center gap-2 min-w-[220px]"
+                                            class="flex min-w-[220px] items-center justify-center gap-2"
                                         >
                                             <button
                                                 v-if="getBalance(order) > 0"
@@ -250,7 +251,7 @@ const paymentStatusClass = (status) => {
 
                                             <span
                                                 v-else
-                                                class="w-[70px] text-center rounded-lg bg-green-50 py-1.5 text-xs font-medium text-green-700"
+                                                class="w-[70px] rounded-lg bg-green-50 py-1.5 text-center text-xs font-medium text-green-700"
                                             >
                                                 Paid
                                             </span>
@@ -262,7 +263,7 @@ const paymentStatusClass = (status) => {
                                                         order.id,
                                                     )
                                                 "
-                                                class="w-[70px] text-center rounded-lg bg-blue-500 py-1.5 text-xs font-medium text-white hover:bg-blue-600"
+                                                class="w-[70px] rounded-lg bg-blue-500 py-1.5 text-center text-xs font-medium text-white hover:bg-blue-600"
                                             >
                                                 Edit
                                             </Link>

@@ -57,23 +57,19 @@ const completedOrders = computed(() => {
 
 const totalOrders = computed(() => currentMonthOrders.value.length);
 
+// SALES = MONEY ACTUALLY RECEIVED
 const dailySales = computed(() =>
     currentMonthOrders.value
         .filter((order) => {
             if (!order.created_at) return false;
             return new Date(order.created_at).getDate() === currentDay;
         })
-        .reduce(
-            (total, order) =>
-                total + Number(order.price || 0) * Number(order.qty || 0),
-            0,
-        ),
+        .reduce((total, order) => total + Number(order.downpayment || 0), 0),
 );
 
 const monthlySales = computed(() =>
     currentMonthOrders.value.reduce(
-        (total, order) =>
-            total + Number(order.price || 0) * Number(order.qty || 0),
+        (total, order) => total + Number(order.downpayment || 0),
         0,
     ),
 );
@@ -87,7 +83,7 @@ const dailySalesData = computed(() => {
         const date = new Date(order.created_at);
         const dayIndex = date.getDate() - 1;
 
-        data[dayIndex] += Number(order.price || 0) * Number(order.qty || 0);
+        data[dayIndex] += Number(order.downpayment || 0);
     });
 
     return data;
@@ -351,7 +347,8 @@ function getSalesAreaPoints() {
                                     <p
                                         class="mt-1 text-sm text-slate-500 text-pretty"
                                     >
-                                        Daily sales for the current month
+                                        Daily received payments for the current
+                                        month
                                     </p>
                                 </div>
                             </div>
@@ -419,7 +416,7 @@ function getSalesAreaPoints() {
                                         <p
                                             v-for="(value, index) in salesYAxis"
                                             :key="`y-${index}`"
-                                            class="text-[10px] font-bold text-blue-300 bg-white/50 pr-1"
+                                            class="bg-white/50 pr-1 text-[10px] font-bold text-blue-300"
                                         >
                                             {{ formatCompactCurrency(value) }}
                                         </p>
@@ -485,7 +482,7 @@ function getSalesAreaPoints() {
                                         </div>
 
                                         <div
-                                            class="mt-2 flex justify-between w-full"
+                                            class="mt-2 flex w-full justify-between"
                                         >
                                             <div
                                                 v-for="item in salesOverview"
@@ -502,7 +499,7 @@ function getSalesAreaPoints() {
                                         </div>
 
                                         <div
-                                            class="mt-0.5 flex justify-between w-full"
+                                            class="mt-0.5 flex w-full justify-between"
                                         >
                                             <div
                                                 v-for="item in salesOverview"

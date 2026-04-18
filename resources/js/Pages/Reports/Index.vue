@@ -46,11 +46,6 @@ const formatCompactCurrency = (value) => {
     return `₱${number.toFixed(0)}`;
 };
 
-/*
-|--------------------------------------------------------------------------
-| Normalized Data Calculations
-|--------------------------------------------------------------------------
-*/
 const normalizedOrderStatistics = computed(() => {
     const orderMap = new Map(
         props.orderStatistics.map((item) => [
@@ -72,40 +67,44 @@ const normalizedOrderStatistics = computed(() => {
     }));
 });
 
-// Max values for scaling
+const totalOrders = computed(() =>
+    normalizedOrderStatistics.value.reduce(
+        (total, item) => total + Number(item.orders || 0),
+        0,
+    ),
+);
+
 const maxOrders = computed(() =>
     Math.max(
         ...normalizedOrderStatistics.value.map((o) => Number(o.orders || 0)),
         1,
     ),
 );
+
 const maxSales = computed(() =>
     Math.max(...props.salesOverview.map((s) => Number(s.sales || 0)), 1),
 );
+
 const maxExpenses = computed(() =>
     Math.max(...props.expenseOverview.map((e) => Number(e.expense || 0)), 1),
 );
 
-/*
-|--------------------------------------------------------------------------
-| Chart Dimensions (Simplified)
-|--------------------------------------------------------------------------
-*/
-// We use 1:1 scaling. The SVG viewBox will match these exactly.
 const chartWidth = 1200;
 const chartHeight = 300;
 
-/*
-|--------------------------------------------------------------------------
-| Coordinate Generators
-|--------------------------------------------------------------------------
-*/
 const getSalesLinePoints = () => {
     if (!props.salesOverview.length) return "";
+    if (props.salesOverview.length === 1) {
+        const item = props.salesOverview[0];
+        const y =
+            chartHeight -
+            (Number(item.sales || 0) / maxSales.value) * chartHeight;
+        return `${chartWidth / 2},${y}`;
+    }
+
     return props.salesOverview
         .map((item, index) => {
             const x = (index * chartWidth) / (props.salesOverview.length - 1);
-            // If sales == maxSales, y is 0 (Top). If sales == 0, y is chartHeight (Bottom).
             const y =
                 chartHeight -
                 (Number(item.sales || 0) / maxSales.value) * chartHeight;
@@ -122,6 +121,14 @@ const getSalesAreaPoints = () => {
 
 const getExpenseLinePoints = () => {
     if (!props.expenseOverview.length) return "";
+    if (props.expenseOverview.length === 1) {
+        const item = props.expenseOverview[0];
+        const y =
+            chartHeight -
+            (Number(item.expense || 0) / maxExpenses.value) * chartHeight;
+        return `${chartWidth / 2},${y}`;
+    }
+
     return props.expenseOverview
         .map((item, index) => {
             const x = (index * chartWidth) / (props.expenseOverview.length - 1);
@@ -139,11 +146,6 @@ const getExpenseAreaPoints = () => {
     return `0,${chartHeight} ${line} ${chartWidth},${chartHeight}`;
 };
 
-/*
-|--------------------------------------------------------------------------
-| Y-Axis Labels
-|--------------------------------------------------------------------------
-*/
 const salesYAxis = computed(() => {
     const max = maxSales.value;
     return [max, max * 0.75, max * 0.5, max * 0.25, 0];
@@ -184,7 +186,6 @@ const ordersYAxis = computed(() => {
         <div class="min-h-screen bg-slate-50 py-8">
             <div class="mx-auto w-full max-w-[1800px] px-4 sm:px-6 lg:px-8">
                 <div class="space-y-8">
-                    <!-- Summary Cards -->
                     <div
                         class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4"
                     >
@@ -218,9 +219,6 @@ const ordersYAxis = computed(() => {
                                                 stroke-linecap="round"
                                                 stroke-linejoin="round"
                                                 stroke-width="2"
-                                                d="浸12h8m-8 6h16"
-                                            />
-                                            <path
                                                 d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                             />
                                         </svg>
@@ -233,9 +231,6 @@ const ordersYAxis = computed(() => {
                                         formatCurrency(props.summary.todaySale)
                                     }}
                                 </h3>
-                                <div
-                                    class="mt-4 flex items-center text-xs font-semibold text-emerald-600"
-                                ></div>
                             </div>
                         </div>
 
@@ -279,9 +274,6 @@ const ordersYAxis = computed(() => {
                                 >
                                     {{ props.summary.todayTotalOrders }}
                                 </h3>
-                                <div
-                                    class="mt-4 flex items-center text-xs font-semibold text-blue-600"
-                                ></div>
                             </div>
                         </div>
 
@@ -376,14 +368,10 @@ const ordersYAxis = computed(() => {
                                         )
                                     }}
                                 </h3>
-                                <div
-                                    class="mt-4 flex items-center text-xs font-semibold text-rose-600"
-                                ></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Order Statistics -->
                     <div
                         class="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:shadow-md"
                     >
@@ -403,7 +391,7 @@ const ordersYAxis = computed(() => {
                             </div>
 
                             <div
-                                class="flex flex-col items-end rounded-2xl bg-indigo-50/50 px-6 py-3 border border-indigo-100/50"
+                                class="flex flex-col items-end rounded-2xl border border-indigo-100/50 bg-indigo-50/50 px-6 py-3"
                             >
                                 <p
                                     class="text-[10px] font-bold uppercase tracking-widest text-indigo-400"
@@ -419,18 +407,14 @@ const ordersYAxis = computed(() => {
                         <div class="relative w-full">
                             <div class="flex gap-4">
                                 <div
-                                    class="hidden w-6 shrink-0 md:flex md:h-[300px] md:flex-col md:justify-between md:pb-12 text-right"
+                                    class="hidden w-6 shrink-0 text-right md:flex md:h-[300px] md:flex-col md:justify-between md:pb-12"
                                 >
                                     <p
                                         v-for="(value, index) in ordersYAxis"
                                         :key="`orders-y-${index}`"
                                         class="text-[10px] font-bold text-slate-300"
                                     >
-                                        {{
-                                            ordersYAxis.indexOf(value) === index
-                                                ? value
-                                                : ""
-                                        }}
+                                        {{ value }}
                                     </p>
                                 </div>
 
@@ -450,7 +434,7 @@ const ordersYAxis = computed(() => {
                                         </div>
 
                                         <div
-                                            class="absolute inset-0 flex items-end justify-between px-1 pb-12 w-full gap-1"
+                                            class="absolute inset-0 flex w-full items-end justify-between gap-1 px-1 pb-12"
                                         >
                                             <div
                                                 v-for="item in normalizedOrderStatistics"
@@ -458,15 +442,15 @@ const ordersYAxis = computed(() => {
                                                 class="group relative flex h-full flex-1 items-end justify-center"
                                             >
                                                 <div
-                                                    class="absolute -top-10 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none"
+                                                    class="pointer-events-none absolute -top-10 z-10 opacity-0 transition-all duration-200 group-hover:opacity-100"
                                                 >
                                                     <div
-                                                        class="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded shadow-xl whitespace-nowrap"
+                                                        class="whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-[10px] font-bold text-white shadow-xl"
                                                     >
                                                         {{ item.orders }}
                                                     </div>
                                                     <div
-                                                        class="w-2 h-2 bg-slate-900 rotate-45 mx-auto -mt-1"
+                                                        class="mx-auto -mt-1 h-2 w-2 rotate-45 bg-slate-900"
                                                     ></div>
                                                 </div>
 
@@ -492,7 +476,7 @@ const ordersYAxis = computed(() => {
                                     </div>
 
                                     <div
-                                        class="flex justify-between px-1 w-full gap-1"
+                                        class="flex w-full justify-between gap-1 px-1"
                                     >
                                         <div
                                             v-for="item in normalizedOrderStatistics"
@@ -509,7 +493,7 @@ const ordersYAxis = computed(() => {
                                     </div>
 
                                     <div
-                                        class="mt-1 flex justify-between px-1 w-full gap-1"
+                                        class="mt-1 flex w-full justify-between gap-1 px-1"
                                     >
                                         <div
                                             v-for="item in normalizedOrderStatistics"
@@ -533,7 +517,6 @@ const ordersYAxis = computed(() => {
                         </div>
                     </div>
 
-                    <!-- Sales Overview -->
                     <div
                         class="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm"
                     >
@@ -551,7 +534,7 @@ const ordersYAxis = computed(() => {
                                 </p>
                             </div>
                             <div
-                                class="flex flex-col items-end rounded-2xl bg-indigo-50/50 px-6 py-3 border border-indigo-100/50"
+                                class="flex flex-col items-end rounded-2xl border border-indigo-100/50 bg-indigo-50/50 px-6 py-3"
                             >
                                 <p
                                     class="text-[10px] font-bold uppercase tracking-widest text-indigo-400"
@@ -571,7 +554,7 @@ const ordersYAxis = computed(() => {
                         <div class="relative w-full">
                             <div class="flex gap-4">
                                 <div
-                                    class="hidden w-12 shrink-0 md:flex md:h-[300px] md:flex-col md:justify-between text-right"
+                                    class="hidden w-12 shrink-0 text-right md:flex md:h-[300px] md:flex-col md:justify-between"
                                 >
                                     <p
                                         v-for="(value, index) in salesYAxis"
@@ -638,7 +621,7 @@ const ordersYAxis = computed(() => {
                                     </div>
 
                                     <div
-                                        class="mt-6 flex justify-between w-full"
+                                        class="mt-6 flex w-full justify-between"
                                     >
                                         <div
                                             v-for="item in props.salesOverview"
@@ -655,7 +638,7 @@ const ordersYAxis = computed(() => {
                                     </div>
 
                                     <div
-                                        class="mt-1 flex justify-between w-full"
+                                        class="mt-1 flex w-full justify-between"
                                     >
                                         <div
                                             v-for="item in props.salesOverview"
@@ -681,7 +664,6 @@ const ordersYAxis = computed(() => {
                         </div>
                     </div>
 
-                    <!-- Expense Overview -->
                     <div
                         class="rounded-3xl border border-slate-100 bg-white p-8 shadow-sm"
                     >
@@ -700,7 +682,7 @@ const ordersYAxis = computed(() => {
                             </div>
 
                             <div
-                                class="flex flex-col items-end rounded-2xl bg-rose-50/50 px-6 py-3 border border-rose-100/50"
+                                class="flex flex-col items-end rounded-2xl border border-rose-100/50 bg-rose-50/50 px-6 py-3"
                             >
                                 <p
                                     class="text-[10px] font-bold uppercase tracking-widest text-rose-400"
@@ -720,7 +702,7 @@ const ordersYAxis = computed(() => {
                         <div class="relative w-full">
                             <div class="flex gap-4">
                                 <div
-                                    class="hidden w-12 shrink-0 md:flex md:h-[300px] md:flex-col md:justify-between text-right"
+                                    class="hidden w-12 shrink-0 text-right md:flex md:h-[300px] md:flex-col md:justify-between"
                                 >
                                     <p
                                         v-for="(value, index) in expenseYAxis"
@@ -787,7 +769,7 @@ const ordersYAxis = computed(() => {
                                     </div>
 
                                     <div
-                                        class="mt-6 flex justify-between w-full"
+                                        class="mt-6 flex w-full justify-between"
                                     >
                                         <div
                                             v-for="item in props.expenseOverview"
@@ -804,7 +786,7 @@ const ordersYAxis = computed(() => {
                                     </div>
 
                                     <div
-                                        class="mt-1 flex justify-between w-full"
+                                        class="mt-1 flex w-full justify-between"
                                     >
                                         <div
                                             v-for="item in props.expenseOverview"
